@@ -38,6 +38,9 @@ target_compile_options(OverlayManager PRIVATE
 )
 
 target_link_options(OverlayManager PRIVATE
+  # res/app.rc embeds the manifest itself; without this the linker adds a second
+  # one and the resource compiler rejects the duplicate.
+  /MANIFEST:NO
   $<$<CONFIG:Release>:/LTCG>
   $<$<CONFIG:Release>:/OPT:REF>
   $<$<CONFIG:Release>:/OPT:ICF>
