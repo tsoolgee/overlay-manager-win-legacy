@@ -634,6 +634,8 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { outline: 2px solid var
 }
 .preview-facts dt { color: var(--muted); }
 .preview-facts dd { font-variant-numeric: tabular-nums; direction: ltr; text-align: start; }
+/* שם הקובץ מקבל dir="auto" ב-HTML, כדי ששם עברי לא ייקרא הפוך */
+.preview-facts dd[dir="auto"] { direction: unset; }
 
 .preview-card .btn { justify-content: center; }
 
@@ -938,7 +940,7 @@ function renderList() {
     const mon = state.monitors[l.monitor];
     const sub = l.missing
       ? `<span class="warn">הקובץ לא נמצא</span>`
-      : esc(`${l.width}×${l.height}  ·  ${mon ? "מסך " + (l.monitor + 1) : "מסך ?"}  ·  ${Math.round(l.opacity / 255 * 100)}%`);
+      : `<span dir="ltr">${l.width}×${l.height}</span>  ·  ${esc(mon ? "מסך " + (l.monitor + 1) : "מסך ?")}  ·  ${Math.round(l.opacity / 255 * 100)}%`;
 
     row.innerHTML = `
       <button class="switch" role="switch" aria-checked="${l.enabled}" aria-label="הפעל שכבה" data-act="toggle"></button>
@@ -1148,7 +1150,7 @@ function renderEditor() {
         <div class="mini" id="mini"></div>
       </div>
       <dl class="preview-facts">
-        <dt>קובץ</dt><dd>${l.image ? esc(baseName(l.image)) : "—"}</dd>
+        <dt>קובץ</dt><dd dir="auto">${l.image ? esc(baseName(l.image)) : "—"}</dd>
         <dt>מסך</dt><dd>${mon.width}×${mon.height}</dd>
         <dt>גודל</dt><dd>${l.width}×${l.height} px</dd>
       </dl>
@@ -1308,7 +1310,7 @@ function refreshRow(i) {
   // חייב להתאים ל-renderList, אחרת עריכה חיה הייתה מוחקת את אזהרת הקובץ החסר
   row.querySelector(".sub").innerHTML = l.missing
     ? `<span class="warn">הקובץ לא נמצא</span>`
-    : esc(`${l.width}×${l.height}  ·  ${mon ? "מסך " + (l.monitor + 1) : "מסך ?"}  ·  ${Math.round(l.opacity / 255 * 100)}%`);
+    : `<span dir="ltr">${l.width}×${l.height}</span>  ·  ${esc(mon ? "מסך " + (l.monitor + 1) : "מסך ?")}  ·  ${Math.round(l.opacity / 255 * 100)}%`;
   row.classList.toggle("off", !l.enabled);
   row.querySelector(".switch").setAttribute("aria-checked", String(l.enabled));
 }
