@@ -1,5 +1,6 @@
 #include "manager.h"
 
+#include <shellapi.h>
 #include <wrl.h>
 #include <WebView2.h>
 
@@ -149,7 +150,13 @@ bool ManagerWindow::Create(bool lightTheme) {
                                 settings->put_AreDevToolsEnabled(FALSE);
                                 settings->put_IsZoomControlEnabled(FALSE);
                                 settings->put_IsStatusBarEnabled(FALSE);
-                                settings->put_AreBrowserAcceleratorKeysEnabled(FALSE);
+
+                                // Suppressing the browser shortcuts (F5, Ctrl+P,
+                                // and friends) arrived in Settings3; on an older
+                                // runtime the app simply keeps them.
+                                ComPtr<ICoreWebView2Settings3> settings3;
+                                if (SUCCEEDED(settings.As(&settings3)) && settings3)
+                                    settings3->put_AreBrowserAcceleratorKeysEnabled(FALSE);
                             }
 
                             // Stamp the theme before first paint, so opening in

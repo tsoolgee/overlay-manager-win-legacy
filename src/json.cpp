@@ -34,8 +34,9 @@ struct Parser {
     void ws() {
         while (p < end && (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r')) ++p;
     }
+
     bool lit(const char* s) {
-        size_t n = strlen(s);
+        const size_t n = strlen(s);
         if ((size_t)(end - p) < n || memcmp(p, s, n) != 0) return false;
         p += n;
         return true;
@@ -44,7 +45,7 @@ struct Parser {
     unsigned hex4() {
         unsigned v = 0;
         for (int i = 0; i < 4 && p < end; ++i, ++p) {
-            char c = *p;
+            const char c = *p;
             v <<= 4;
             if (c >= '0' && c <= '9') v |= (unsigned)(c - '0');
             else if (c >= 'a' && c <= 'f') v |= (unsigned)(c - 'a' + 10);
@@ -58,9 +59,12 @@ struct Parser {
         if (p >= end || *p != '"') return out;
         ++p;
         while (p < end && *p != '"') {
-            if (*p != '\') { out += *p++; continue; }
+            if (*p != '\\') {
+                out += *p++;
+                continue;
+            }
             if (++p >= end) break;
-            char c = *p++;
+            const char c = *p++;
             switch (c) {
                 case 'n': out += '\n'; break;
                 case 't': out += '\t'; break;
@@ -69,19 +73,24 @@ struct Parser {
                 case 'f': out += '\f'; break;
                 case 'u': {
                     unsigned cp = hex4();
-                    // Re-join a UTF-16 surrogate pair into one code point.
-                    if (cp >= 0xD800 && cp <= 0xDBFF && p + 1 < end && p[0] == '\' && p[1] == 'u') {
+                    // Re-join a UTF-16 surrogate pair into a single code point.
+                    if (cp >= 0xD800 && cp <= 0xDBFF && p + 1 < end &&
+                        p[0] == '\\' && p[1] == 'u') {
                         p += 2;
-                        unsigned lo = hex4();
-                        if (lo >= 0xDC00 && lo <= 0xDFFF)
+                        const unsigned lo = hex4();
+                        if (lo >= 0xDC00 && lo <= 0xDFFF) {
                             cp = 0x10000 + ((cp - 0xD800) << 10) + (lo - 0xDC00);
-                        else
-                            appendUtf8(out, cp), cp = lo;
+                        } else {
+                            // Unpaired high surrogate: emit both as-is rather
+                            // than dropping characters.
+                            appendUtf8(out, cp);
+                            cp = lo;
+                        }
                     }
                     appendUtf8(out, cp);
                     break;
                 }
-                default: out += c; break;  // covers \" \ \/
+                default: out += c; break;  // covers \" \\ and \/
             }
         }
         if (p < end) ++p;  // closing quote
@@ -92,12 +101,17 @@ struct Parser {
         ws();
         if (p >= end) return Value();
         switch (*p) {
-            case '"': return Value(str());
+            case '"':
+                return Value(str());
+
             case '{': {
                 ++p;
                 Object o;
                 ws();
-                if (p < end && *p == '}') { ++p; return Value(std::move(o)); }
+                if (p < end && *p == '}') {
+                    ++p;
+                    return Value(std::move(o));
+                }
                 while (p < end) {
                     ws();
                     std::string k = str();
@@ -105,33 +119,48 @@ struct Parser {
                     if (p < end && *p == ':') ++p;
                     o[k] = value();
                     ws();
-                    if (p < end && *p == ',') { ++p; continue; }
+                    if (p < end && *p == ',') {
+                        ++p;
+                        continue;
+                    }
                     break;
                 }
                 if (p < end && *p == '}') ++p;
                 return Value(std::move(o));
             }
+
             case '[': {
                 ++p;
                 Array a;
                 ws();
-                if (p < end && *p == ']') { ++p; return Value(std::move(a)); }
+                if (p < end && *p == ']') {
+                    ++p;
+                    return Value(std::move(a));
+                }
                 while (p < end) {
                     a.push_back(value());
                     ws();
-                    if (p < end && *p == ',') { ++p; continue; }
+                    if (p < end && *p == ',') {
+                        ++p;
+                        continue;
+                    }
                     break;
                 }
                 if (p < end && *p == ']') ++p;
                 return Value(std::move(a));
             }
+
             case 't': return lit("true") ? Value(true) : Value();
             case 'f': return lit("false") ? Value(false) : Value();
             case 'n': lit("null"); return Value();
+
             default: {
                 char* stop = nullptr;
-                double d = strtod(p, &stop);
-                if (stop == p) { ++p; return Value(); }
+                const double d = strtod(p, &stop);
+                if (stop == p) {
+                    ++p;  // not a number at all; skip it so parsing terminates
+                    return Value();
+                }
                 p = stop;
                 return Value(d);
             }
@@ -146,17 +175,17 @@ void Value::dumpString(const std::string& s, std::string& out) {
     for (unsigned char c : s) {
         switch (c) {
             case '"':  out += "\\\""; break;
-            case '\': out += "\\\\"; break;
-            case '\n': out += "\n";  break;
-            case '\r': out += "\r";  break;
-            case '\t': out += "\t";  break;
+            case '\\': out += "\\\\"; break;
+            case '\n': out += "\\n";  break;
+            case '\r': out += "\\r";  break;
+            case '\t': out += "\\t";  break;
             default:
                 if (c < 0x20) {
                     char buf[8];
-                    snprintf(buf, sizeof buf, "\u%04x", c);
+                    snprintf(buf, sizeof buf, "\\u%04x", c);
                     out += buf;
                 } else {
-                    // UTF-8 bytes pass through untouched; the WebView reads UTF-8.
+                    // UTF-8 bytes pass through untouched: the WebView reads UTF-8.
                     out += (char)c;
                 }
         }
@@ -167,10 +196,18 @@ void Value::dumpString(const std::string& s, std::string& out) {
 std::string Value::dump() const {
     std::string out;
     switch (type_) {
-        case Type::Null: out = "null"; break;
-        case Type::Bool: out = num_ != 0 ? "true" : "false"; break;
+        case Type::Null:
+            out = "null";
+            break;
+
+        case Type::Bool:
+            out = num_ != 0 ? "true" : "false";
+            break;
+
         case Type::Number: {
             char buf[40];
+            // Print whole numbers without a decimal point, so ids and pixel
+            // counts read as integers on the JavaScript side.
             if (num_ == (double)(long long)num_ && std::fabs(num_) < 1e15)
                 snprintf(buf, sizeof buf, "%lld", (long long)num_);
             else
@@ -178,7 +215,11 @@ std::string Value::dump() const {
             out = buf;
             break;
         }
-        case Type::String: dumpString(str_, out); break;
+
+        case Type::String:
+            dumpString(str_, out);
+            break;
+
         case Type::Array: {
             out = "[";
             for (size_t i = 0; i < arr_.size(); ++i) {
@@ -188,6 +229,7 @@ std::string Value::dump() const {
             out += ']';
             break;
         }
+
         case Type::Object: {
             out = "{";
             bool first = true;

@@ -514,8 +514,10 @@ LRESULT OverlayWindow::Handle(UINT msg, WPARAM wp, LPARAM lp) {
                 layer_.offsetX = mon.width ? ox * 100.0 / mon.width : 0;
                 layer_.offsetY = mon.height ? oy * 100.0 / mon.height : 0;
             } else {
-                int nw = std::max(kMinSide, (grabRect_.right - grabRect_.left) + dx);
-                int nh = std::max(kMinSide, (grabRect_.bottom - grabRect_.top) + dy);
+                // RECT members are LONG; narrow explicitly so std::max has one
+                // type to work with.
+                int nw = std::max(kMinSide, (int)(grabRect_.right - grabRect_.left) + dx);
+                int nh = std::max(kMinSide, (int)(grabRect_.bottom - grabRect_.top) + dy);
                 if (layer_.lockAspect && layer_.width > 0 && layer_.height > 0) {
                     const double ratio = (double)layer_.height / layer_.width;
                     nh = std::max(kMinSide, (int)std::lround(nw * ratio));

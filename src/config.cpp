@@ -5,6 +5,7 @@
 
 #include <cstdio>
 #include <cstdlib>
+#include <vector>
 
 namespace {
 
@@ -18,11 +19,12 @@ std::wstring Section(int i) {
 
 std::wstring GetStr(const wchar_t* sec, const wchar_t* key, const wchar_t* def,
                     const std::wstring& path) {
-    // GetPrivateProfileString truncates silently, so grow until it fits.
+    // GetPrivateProfileString truncates silently, so grow the buffer until the
+    // value fits rather than clipping a long image path.
     std::vector<wchar_t> buf(512);
     for (;;) {
-        DWORD n = GetPrivateProfileStringW(sec, key, def, buf.data(),
-                                           (DWORD)buf.size(), path.c_str());
+        const DWORD n = GetPrivateProfileStringW(sec, key, def, buf.data(),
+                                                 (DWORD)buf.size(), path.c_str());
         if (n < buf.size() - 1) return std::wstring(buf.data(), n);
         buf.resize(buf.size() * 2);
     }
@@ -34,7 +36,7 @@ int GetInt(const wchar_t* sec, const wchar_t* key, int def, const std::wstring& 
 
 double GetDouble(const wchar_t* sec, const wchar_t* key, double def,
                  const std::wstring& path) {
-    std::wstring s = GetStr(sec, key, L"", path);
+    const std::wstring s = GetStr(sec, key, L"", path);
     if (s.empty()) return def;
     return _wtof(s.c_str());
 }
@@ -65,12 +67,12 @@ std::wstring ConfigDir() {
     if (FAILED(SHGetFolderPathW(nullptr, CSIDL_APPDATA, nullptr, 0, appdata)))
         return L".";
     std::wstring dir = appdata;
-    dir += L"\OverlayManager";
+    dir += L"\\OverlayManager";
     CreateDirectoryW(dir.c_str(), nullptr);
     return dir;
 }
 
-std::wstring ConfigPath() { return ConfigDir() + L"\config.ini"; }
+std::wstring ConfigPath() { return ConfigDir() + L"\\config.ini"; }
 
 bool LoadConfig(Settings& settings, std::vector<Layer>& layers) {
     const std::wstring path = ConfigPath();
@@ -80,7 +82,8 @@ bool LoadConfig(Settings& settings, std::vector<Layer>& layers) {
     settings.minimizeToTray = GetInt(kGeneral, L"MinimizeToTray", 1, path) != 0;
     settings.showTrayIcon   = GetInt(kGeneral, L"ShowTrayIcon", 1, path) != 0;
     settings.lightTheme     = GetInt(kGeneral, L"LightTheme", 0, path) != 0;
-    settings.hotkeyMods     = (unsigned)GetInt(kGeneral, L"HotkeyMods", MOD_CONTROL | MOD_ALT, path);
+    settings.hotkeyMods     = (unsigned)GetInt(kGeneral, L"HotkeyMods",
+                                               MOD_CONTROL | MOD_ALT, path);
     settings.hotkeyVk       = (unsigned)GetInt(kGeneral, L"HotkeyVk", 'H', path);
 
     const int count = GetInt(kGeneral, L"Count", 0, path);
@@ -88,6 +91,9 @@ bool LoadConfig(Settings& settings, std::vector<Layer>& layers) {
     for (int i = 0; i < count; ++i) {
         const std::wstring sec = Section(i);
         const wchar_t* s = sec.c_str();
+
+        // Keys absent from an older config.ini fall back to the struct's own
+        // defaults, which is what keeps a version 3 configuration loading.
         Layer l;
         l.name         = GetStr(s, L"Name", L"שכבה", path);
         l.image        = GetStr(s, L"Image", L"", path);
@@ -114,9 +120,10 @@ bool LoadConfig(Settings& settings, std::vector<Layer>& layers) {
 }
 
 bool SaveConfig(const Settings& settings, const std::vector<Layer>& layers) {
-    // The original wrote key by key with WritePrivateProfileString, which meant
-    // a crash mid-save could leave a half-written file and stale sections from
-    // a previously longer list. Build the whole file, then swap it in.
+    // The original wrote key by key with WritePrivateProfileString, so a crash
+    // mid-save could leave a half-written file, and deleting a layer left the
+    // now-surplus [Overlay_N] section behind. Build the whole file, then swap
+    // it in with one atomic rename.
     std::wstring text = L"[General]\r\n";
     PutInt(text, L"Count", (long long)layers.size());
     PutInt(text, L"AutoStart", settings.autoStart ? 1 : 0);
@@ -155,21 +162,23 @@ bool SaveConfig(const Settings& settings, const std::vector<Layer>& layers) {
     const std::wstring path = ConfigPath();
     const std::wstring temp = path + L".tmp";
 
-    HANDLE h = CreateFileW(temp.c_str(), GENERIC_WRITE, 0, nullptr,
-                           CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+    HANDLE h = CreateFileW(temp.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS,
+                           FILE_ATTRIBUTE_NORMAL, nullptr);
     if (h == INVALID_HANDLE_VALUE) return false;
 
     // UTF-16 LE with a BOM, so the profile API reads it back as Unicode and
-    // Hebrew layer names survive a round trip.
-    bool ok = true;
+    // Hebrew layer names survive the round trip.
     const wchar_t bom = 0xFEFF;
     DWORD written = 0;
-    ok = ok && WriteFile(h, &bom, sizeof bom, &written, nullptr);
+    bool ok = WriteFile(h, &bom, sizeof bom, &written, nullptr) != FALSE;
     ok = ok && WriteFile(h, text.data(), (DWORD)(text.size() * sizeof(wchar_t)),
-                         &written, nullptr);
-    ok = ok && FlushFileBuffers(h);
+                         &written, nullptr) != FALSE;
+    ok = ok && FlushFileBuffers(h) != FALSE;
     CloseHandle(h);
-    if (!ok) { DeleteFileW(temp.c_str()); return false; }
+    if (!ok) {
+        DeleteFileW(temp.c_str());
+        return false;
+    }
 
     if (!MoveFileExW(temp.c_str(), path.c_str(), MOVEFILE_REPLACE_EXISTING)) {
         DeleteFileW(temp.c_str());
