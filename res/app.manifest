@@ -19,7 +19,11 @@
            in the wrong place and blur them. -->
       <dpiAwareness xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">PerMonitorV2,PerMonitor</dpiAwareness>
       <dpiAware xmlns="http://schemas.microsoft.com/SMI/2005/WindowsSettings">true/pm</dpiAware>
-      <activeCodePage xmlns="http://schemas.microsoft.com/SMI/2019/WindowsSettings">UTF-8</activeCodePage>
+      <!-- Deliberately NOT setting activeCodePage to UTF-8. A config.ini written
+           by the original build is ANSI (CP1255 on a Hebrew system), and
+           GetPrivateProfileStringW decodes it with the process ANSI code page —
+           forcing UTF-8 here would turn every existing Hebrew layer name into
+           mojibake. All app code uses the wide APIs, so nothing needs it. -->
     </windowsSettings>
   </application>
 
