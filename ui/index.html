@@ -1,0 +1,1437 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="color-scheme" content="dark light">
+<title>Overlay Manager</title>
+<style>
+/* ============================================================
+   Overlay Manager — ממשק הניהול
+   ערכת Slate של tsoolgee.uk: כהה כברירת מחדל, בהיר בבחירה.
+   Rubik לכותרות / Assistant לגוף, עם נפילה ל-Segoe UI כשאינם
+   מותקנים — התוכנה עובדת גם בלי אינטרנט, אז אין גופני רשת.
+   ============================================================ */
+:root {
+  --bg:        #0f172a;
+  --panel:     #1e293b;
+  --panel-2:   #172033;
+  --line:      #334155;
+  --line-soft: #26334a;
+  --ink:       #f8fafc;
+  --ink-2:     #cbd5e1;
+  --muted:     #94a3b8;
+  --accent:    #38bdf8;
+  --accent-fill: #38bdf8;
+  --accent-hi: #7dd3fc;
+  --on-fill:   #0f172a;
+  --danger:    #f87171;
+  --danger-fill: #ef4444;
+  --ok:        #4ade80;
+  --field:     #0f172a;
+  --field-line:#3d4d68;
+  --shadow:    0 10px 30px rgba(0,0,0,.4);
+  --shadow-sm: 0 2px 8px rgba(0,0,0,.3);
+  --checker-a: #1b2536;
+  --checker-b: #222e42;
+  --scrim:     rgba(15,23,42,.72);
+}
+
+:root[data-theme="light"] {
+  --bg:        #eef2f7;
+  --panel:     #ffffff;
+  --panel-2:   #f6f9fc;
+  --line:      #d9e1ea;
+  --line-soft: #e6ecf3;
+  --ink:       #0f172a;
+  --ink-2:     #33465c;
+  --muted:     #5b7183;
+  --accent:    #075985;
+  --accent-fill: #0369a1;
+  --accent-hi: #075985;
+  --on-fill:   #ffffff;
+  --danger:    #b91c1c;
+  --danger-fill: #dc2626;
+  --ok:        #15803d;
+  --field:     #ffffff;
+  --field-line:#c3d0de;
+  --shadow:    0 10px 30px rgba(15,42,60,.10);
+  --shadow-sm: 0 2px 8px rgba(15,42,60,.08);
+  --checker-a: #e9eef4;
+  --checker-b: #f4f7fa;
+  --scrim:     rgba(238,242,247,.75);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body { height: 100%; }
+
+body {
+  font-family: "Assistant", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.55;
+  overflow: hidden;
+  -webkit-user-select: none;
+  user-select: none;
+  cursor: default;
+}
+
+h1, h2, h3, .brand {
+  font-family: "Rubik", "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+  line-height: 1.25;
+  font-weight: 600;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* ---------- מסגרת ---------- */
+.app {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  height: 100%;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 18px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 15px;
+  letter-spacing: -0.01em;
+}
+.brand .mark {
+  width: 22px; height: 22px;
+  flex: none;
+  color: var(--accent);
+}
+.brand small {
+  font-family: "Assistant", "Segoe UI", sans-serif;
+  font-weight: 400;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.topbar .spacer { flex: 1; }
+
+/* ---------- כפתורים ---------- */
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  cursor: pointer;
+  border-radius: 8px;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 13px;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--ink-2);
+  font-weight: 500;
+  white-space: nowrap;
+  transition: background .12s, border-color .12s, color .12s;
+}
+.btn:hover { border-color: var(--accent); color: var(--ink); }
+.btn:active { transform: translateY(1px); }
+.btn svg { width: 15px; height: 15px; flex: none; }
+
+.btn.primary {
+  background: var(--accent-fill);
+  border-color: var(--accent-fill);
+  color: var(--on-fill);
+  font-weight: 600;
+}
+.btn.primary:hover { background: var(--accent-hi); border-color: var(--accent-hi); color: var(--on-fill); }
+
+.btn.ghost { background: transparent; border-color: transparent; color: var(--muted); }
+.btn.ghost:hover { background: var(--panel-2); border-color: var(--line); color: var(--ink); }
+
+.btn.danger:hover { border-color: var(--danger); color: var(--danger); }
+
+.btn.on {
+  background: var(--accent-fill);
+  border-color: var(--accent-fill);
+  color: var(--on-fill);
+}
+
+.btn[disabled] { opacity: .4; pointer-events: none; }
+
+.icon-btn {
+  width: 30px; height: 30px;
+  display: grid;
+  place-items: center;
+  border: 1px solid transparent;
+  color: var(--muted);
+}
+.icon-btn:hover { background: var(--panel-2); border-color: var(--line); color: var(--ink); }
+.icon-btn svg { width: 16px; height: 16px; }
+
+/* ---------- גוף: שתי חטיבות ---------- */
+.body {
+  display: grid;
+  grid-template-columns: 268px 1fr;
+  min-height: 0;
+}
+
+/* ---------- רשימת השכבות ---------- */
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--panel);
+  border-inline-start: 1px solid var(--line);
+}
+
+.sidebar-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 14px 10px;
+}
+.sidebar-head h2 {
+  font-size: 12px;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 600;
+  flex: 1;
+}
+.count-pill {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  color: var(--muted);
+}
+
+.layer-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 8px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.layer {
+  display: grid;
+  grid-template-columns: auto 34px 1fr auto;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 8px;
+  border-radius: 9px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background .12s, border-color .12s;
+}
+.layer:hover { background: var(--panel-2); }
+.layer.sel {
+  background: color-mix(in srgb, var(--accent) 14%, var(--panel));
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+}
+.layer.dragging { opacity: .45; }
+.layer.drop-before { box-shadow: 0 -2px 0 var(--accent); }
+.layer.drop-after  { box-shadow: 0 2px 0 var(--accent); }
+
+.layer .thumb {
+  width: 34px; height: 34px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background-color: var(--checker-a);
+  background-image:
+    linear-gradient(45deg, var(--checker-b) 25%, transparent 25%, transparent 75%, var(--checker-b) 75%),
+    linear-gradient(45deg, var(--checker-b) 25%, transparent 25%, transparent 75%, var(--checker-b) 75%);
+  background-size: 10px 10px;
+  background-position: 0 0, 5px 5px;
+  object-fit: contain;
+  flex: none;
+}
+.layer .thumb.empty { display: grid; place-items: center; color: var(--muted); }
+.layer .thumb.empty svg { width: 15px; height: 15px; }
+
+.layer .meta { min-width: 0; display: block; }
+/* חייבים block כדי שהחיתוך בשלוש נקודות יעבוד ושתי השורות יישבו זו מעל זו */
+.layer .name, .layer .sub { display: block; }
+.layer .name {
+  font-weight: 600;
+  font-size: 13.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.layer .sub {
+  font-size: 11.5px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.layer.off .name, .layer.off .thumb { opacity: .45; }
+
+.layer .grip { color: var(--muted); opacity: 0; }
+.layer:hover .grip, .layer.sel .grip { opacity: .7; }
+.layer .grip svg { width: 13px; height: 13px; display: block; }
+
+/* מתג הפעלה */
+.switch {
+  --w: 32px; --h: 18px;
+  position: relative;
+  width: var(--w); height: var(--h);
+  flex: none;
+  border-radius: 999px;
+  background: var(--field-line);
+  border: none;
+  transition: background .15s;
+}
+.switch::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  inset-inline-start: 2px;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  transition: translate .15s;
+  box-shadow: 0 1px 3px rgba(0,0,0,.35);
+}
+.switch[aria-checked="true"] { background: var(--accent-fill); }
+.switch[aria-checked="true"]::after { translate: calc((var(--w) - var(--h)) * -1) 0; }
+
+.sidebar-foot {
+  display: flex;
+  gap: 6px;
+  padding: 9px 12px;
+  border-top: 1px solid var(--line);
+}
+.sidebar-foot .btn { flex: 1; justify-content: center; padding: 7px 8px; }
+
+/* ---------- העורך ---------- */
+.editor {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 18px 22px 24px;
+}
+
+.editor-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 22px;
+  align-items: start;
+  max-width: 1100px;
+}
+
+fieldset {
+  border: none;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+fieldset + fieldset { margin-top: 22px; }
+
+legend, .group-title {
+  font-size: 12px;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 600;
+  font-family: "Rubik", "Segoe UI", sans-serif;
+  padding: 0 0 9px;
+  border-bottom: 1px solid var(--line-soft);
+  width: 100%;
+  margin-bottom: 3px;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 108px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+}
+.row > label:first-child { color: var(--ink-2); font-size: 13px; }
+.row.wide { grid-template-columns: 1fr; }
+
+.pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+input[type="text"], input[type="number"], select {
+  font: inherit;
+  color: var(--ink);
+  background: var(--field);
+  border: 1px solid var(--field-line);
+  border-radius: 8px;
+  padding: 7px 10px;
+  width: 100%;
+  min-width: 0;
+  transition: border-color .12s, box-shadow .12s;
+}
+input[type="number"] { font-variant-numeric: tabular-nums; }
+input:hover, select:hover { border-color: var(--muted); }
+input:focus, select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+select {
+  appearance: none;
+  padding-inline-end: 30px;
+  background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%),
+                    linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+  background-position: left 13px top 15px, left 8px top 15px;
+  background-size: 5px 5px;
+  background-repeat: no-repeat;
+}
+
+.file-row { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 8px; }
+.file-row input { direction: ltr; text-align: left; font-size: 12.5px; }
+
+/* מספר עם יחידה */
+.unit { position: relative; }
+.unit input { padding-inline-end: 30px; direction: ltr; text-align: left; }
+.unit::after {
+  content: attr(data-unit);
+  position: absolute;
+  inset-inline-end: 10px;
+  top: 50%;
+  translate: 0 -50%;
+  font-size: 11.5px;
+  color: var(--muted);
+  pointer-events: none;
+}
+
+/* תיבת סימון */
+.check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  color: var(--ink-2);
+  font-size: 13px;
+}
+.check input { position: absolute; opacity: 0; width: 0; height: 0; }
+.check .box {
+  width: 17px; height: 17px;
+  flex: none;
+  border: 1px solid var(--field-line);
+  border-radius: 5px;
+  background: var(--field);
+  display: grid;
+  place-items: center;
+  transition: background .12s, border-color .12s;
+}
+.check .box svg { width: 11px; height: 11px; color: var(--on-fill); opacity: 0; }
+.check input:checked + .box { background: var(--accent-fill); border-color: var(--accent-fill); }
+.check input:checked + .box svg { opacity: 1; }
+.check input:focus-visible + .box { outline: 2px solid var(--accent); outline-offset: 2px; }
+.check:hover .box { border-color: var(--accent); }
+
+/* ---------- לוח העיגון (3x3) ---------- */
+.anchor-block { display: grid; grid-template-columns: auto minmax(0,1fr); gap: 14px; align-items: center; }
+
+.anchor-pad {
+  display: grid;
+  grid-template-columns: repeat(3, 26px);
+  grid-template-rows: repeat(3, 26px);
+  gap: 3px;
+  padding: 4px;
+  background: var(--field);
+  border: 1px solid var(--field-line);
+  border-radius: 9px;
+  flex: none;
+  /* הפריסה חזותית — שמאל הוא באמת שמאל המסך, גם בממשק בעברית */
+  direction: ltr;
+}
+.anchor-pad button {
+  border-radius: 5px;
+  background: var(--panel-2);
+  display: grid;
+  place-items: center;
+  transition: background .12s;
+}
+.anchor-pad button:hover { background: color-mix(in srgb, var(--accent) 30%, var(--panel-2)); }
+.anchor-pad button .dot {
+  width: 7px; height: 7px;
+  border-radius: 2px;
+  background: var(--muted);
+  transition: background .12s, scale .12s;
+}
+.anchor-pad button[aria-pressed="true"] { background: var(--accent-fill); }
+.anchor-pad button[aria-pressed="true"] .dot { background: var(--on-fill); scale: 1.25; }
+
+.anchor-side { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.anchor-name { font-size: 13px; color: var(--ink-2); }
+.anchor-name b { font-weight: 600; color: var(--ink); }
+
+/* ---------- מחוונים ---------- */
+.slider-row {
+  display: grid;
+  grid-template-columns: 108px minmax(0,1fr) 62px;
+  align-items: center;
+  gap: 12px;
+}
+.slider-row > label:first-child { color: var(--ink-2); font-size: 13px; }
+.slider-row output {
+  font-variant-numeric: tabular-nums;
+  font-size: 12.5px;
+  color: var(--muted);
+  text-align: center;
+  border: 1px solid var(--line-soft);
+  border-radius: 6px;
+  padding: 3px 0;
+  direction: ltr;
+}
+
+input[type="range"] {
+  appearance: none;
+  width: 100%;
+  height: 20px;
+  background: none;
+  cursor: pointer;
+  direction: ltr;
+}
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--field-line);
+}
+input[type="range"]::-webkit-slider-thumb {
+  appearance: none;
+  width: 15px; height: 15px;
+  margin-top: -5.5px;
+  border-radius: 50%;
+  background: var(--accent-fill);
+  border: 2px solid var(--panel);
+  box-shadow: var(--shadow-sm);
+  transition: scale .1s;
+}
+input[type="range"]:hover::-webkit-slider-thumb { scale: 1.12; }
+input[type="range"]:focus-visible::-webkit-slider-thumb { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* דגימת צבע */
+.swatch-row { display: flex; align-items: center; gap: 10px; }
+.swatch {
+  width: 34px; height: 30px;
+  border-radius: 8px;
+  border: 1px solid var(--field-line);
+  flex: none;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.08);
+}
+.swatch-hex {
+  font-family: "JetBrains Mono", ui-monospace, Consolas, monospace;
+  font-size: 12px;
+  color: var(--muted);
+  direction: ltr;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- תצוגה מקדימה ---------- */
+.preview-card {
+  position: sticky;
+  top: 0;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: var(--shadow-sm);
+}
+.preview-card h3 {
+  font-size: 12px;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.screen {
+  position: relative;
+  width: 100%;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  overflow: hidden;
+  background-color: var(--checker-a);
+  background-image:
+    linear-gradient(45deg, var(--checker-b) 25%, transparent 25%, transparent 75%, var(--checker-b) 75%),
+    linear-gradient(45deg, var(--checker-b) 25%, transparent 25%, transparent 75%, var(--checker-b) 75%);
+  background-size: 14px 14px;
+  background-position: 0 0, 7px 7px;
+  direction: ltr;
+}
+.screen .taskbar {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  height: 7%;
+  background: color-mix(in srgb, var(--ink) 12%, transparent);
+  border-top: 1px solid color-mix(in srgb, var(--ink) 10%, transparent);
+}
+.mini {
+  position: absolute;
+  display: grid;
+  place-items: center;
+}
+.mini img {
+  width: 100%; height: 100%;
+  object-fit: fill;
+  display: block;
+}
+.mini .tintlayer {
+  position: absolute;
+  inset: 0;
+  mix-blend-mode: multiply;
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+}
+.mini.blank {
+  border: 1px dashed var(--muted);
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--muted) 18%, transparent);
+}
+
+.preview-facts {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 12px;
+  font-size: 12.5px;
+}
+.preview-facts dt { color: var(--muted); }
+.preview-facts dd { font-variant-numeric: tabular-nums; direction: ltr; text-align: start; }
+
+.preview-card .btn { justify-content: center; }
+
+/* ---------- מצב ריק ---------- */
+.empty {
+  height: 100%;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 14px;
+  text-align: center;
+  padding: 40px;
+  color: var(--muted);
+}
+.empty svg { width: 52px; height: 52px; color: var(--line); }
+.empty h2 { font-size: 17px; color: var(--ink); }
+.empty p { max-width: 40ch; font-size: 13.5px; }
+
+/* ---------- שורת הכלים התחתונה ---------- */
+.statusbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 18px;
+  background: var(--panel);
+  border-top: 1px solid var(--line);
+  font-size: 12.5px;
+}
+.statusbar .hint { color: var(--muted); }
+.statusbar .hint kbd {
+  font-family: "JetBrains Mono", ui-monospace, Consolas, monospace;
+  font-size: 11px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--ink-2);
+  direction: ltr;
+  display: inline-block;
+}
+.statusbar .spacer { flex: 1; }
+
+/* ---------- הודעות ---------- */
+.toast-wrap {
+  position: fixed;
+  inset-block-end: 54px;
+  inset-inline-start: 50%;
+  translate: 50% 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+  pointer-events: none;
+  z-index: 40;
+}
+.toast {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-inline-start: 3px solid var(--ok);
+  box-shadow: var(--shadow);
+  border-radius: 9px;
+  padding: 9px 15px;
+  font-size: 13px;
+  animation: rise .22s ease-out;
+}
+.toast.warn { border-inline-start-color: var(--danger); }
+@keyframes rise { from { opacity: 0; translate: 0 8px; } }
+
+/* ---------- דיאלוג ההגדרות ---------- */
+dialog {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel);
+  color: var(--ink);
+  padding: 0;
+  width: min(430px, 92vw);
+  box-shadow: var(--shadow);
+}
+dialog::backdrop { background: var(--scrim); }
+.dlg-head {
+  display: flex;
+  align-items: center;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--line);
+}
+.dlg-head h2 { font-size: 15px; flex: 1; }
+.dlg-body { padding: 16px 18px; display: flex; flex-direction: column; gap: 14px; }
+.dlg-foot {
+  display: flex;
+  justify-content: flex-start;
+  gap: 8px;
+  padding: 12px 18px;
+  border-top: 1px solid var(--line);
+}
+.dlg-note {
+  font-size: 12.5px;
+  color: var(--muted);
+  background: var(--panel-2);
+  border: 1px solid var(--line-soft);
+  border-radius: 9px;
+  padding: 10px 12px;
+}
+.dlg-note kbd {
+  font-family: "JetBrains Mono", ui-monospace, Consolas, monospace;
+  font-size: 11px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  direction: ltr;
+  display: inline-block;
+}
+
+/* ---------- פסי גלילה ---------- */
+::-webkit-scrollbar { width: 11px; height: 11px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: 99px;
+  border: 3px solid var(--panel);
+}
+::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header class="topbar">
+    <div class="brand">
+      <svg class="mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true">
+        <path d="M12 3 3 7.5l9 4.5 9-4.5z"/>
+        <path d="M3 12l9 4.5 9-4.5" opacity=".6"/>
+        <path d="M3 16.5 12 21l9-4.5" opacity=".32"/>
+      </svg>
+      <span>Overlay Manager<br><small>ניהול חותמות צפות</small></span>
+    </div>
+
+    <div class="spacer"></div>
+
+    <button class="btn" id="btnToggleAll" title="הצג או הסתר את כל השכבות">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z"/><circle cx="12" cy="12" r="2.6"/></svg>
+      <span id="toggleAllLabel">הסתר הכל</span>
+    </button>
+
+    <button class="icon-btn" id="btnTheme" title="החלף ערכת נושא" aria-label="החלף ערכת נושא">
+      <svg id="themeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M21 12.8A8.5 8.5 0 1 1 11.2 3a6.6 6.6 0 0 0 9.8 9.8z"/></svg>
+    </button>
+
+    <button class="icon-btn" id="btnSettings" title="הגדרות כלליות" aria-label="הגדרות כלליות">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1A1.6 1.6 0 0 0 9 19.4a1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1A1.6 1.6 0 0 0 4.6 9a1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/></svg>
+    </button>
+  </header>
+
+  <div class="body">
+    <main class="editor" id="editor"></main>
+
+    <aside class="sidebar">
+      <div class="sidebar-head">
+        <h2>שכבות</h2>
+        <span class="count-pill" id="countPill">0</span>
+      </div>
+      <div class="layer-list" id="layerList" role="listbox" aria-label="שכבות" tabindex="0"></div>
+      <div class="sidebar-foot">
+        <button class="btn" id="btnAdd">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+          הוסף
+        </button>
+        <button class="btn" id="btnDup" title="שכפל את השכבה הנבחרת">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg>
+          שכפל
+        </button>
+        <button class="btn danger" id="btnDel" title="מחק את השכבה הנבחרת">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>
+          מחק
+        </button>
+      </div>
+    </aside>
+  </div>
+
+  <footer class="statusbar">
+    <button class="btn primary" id="btnSave">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>
+      שמור הגדרות
+    </button>
+    <span class="hint" id="statusHint"></span>
+    <div class="spacer"></div>
+    <span class="hint"><kbd id="hotkeyHint">Ctrl+Alt+H</kbd> מעלים ומציג הכל בכל מקום — נוח לצילומי מסך</span>
+  </footer>
+</div>
+
+<div class="toast-wrap" id="toasts" aria-live="polite"></div>
+
+<dialog id="settingsDlg">
+  <form method="dialog">
+    <div class="dlg-head"><h2>הגדרות כלליות</h2></div>
+    <div class="dlg-body">
+      <label class="check">
+        <input type="checkbox" id="setAutoStart">
+        <span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+        הפעלה אוטומטית עם Windows
+      </label>
+      <label class="check">
+        <input type="checkbox" id="setTray">
+        <span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+        סגירת החלון ממזערת למגש המערכת
+      </label>
+      <label class="check">
+        <input type="checkbox" id="setTrayIcon">
+        <span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+        הצג סמל במגש המערכת
+      </label>
+      <p class="dlg-note">
+        בלי סמל במגש, הדרך היחידה לפתוח את החלון היא להריץ את הקובץ שוב.
+        <kbd id="hotkeyHint2">Ctrl+Alt+H</kbd> ימשיך לעבוד בכל מקרה.
+      </p>
+    </div>
+    <div class="dlg-foot">
+      <button class="btn primary" value="ok">סגור</button>
+      <button class="btn danger" id="btnExit" type="button">צא מהתוכנה</button>
+    </div>
+  </form>
+</dialog>
+
+<script>
+"use strict";
+
+// ---------------------------------------------------------------------------
+// גשר אל צד ה-C++. כל הודעה היא JSON; `c` הוא הפקודה, `t` הוא סוג העדכון.
+// ---------------------------------------------------------------------------
+const HOST = window.chrome && window.chrome.webview;
+function send(msg) { if (HOST) HOST.postMessage(msg); }
+
+const state = {
+  layers: [],
+  monitors: [],
+  settings: { autoStart: false, minimizeToTray: true, showTrayIcon: true, lightTheme: false, hotkey: "Ctrl+Alt+H" },
+  selected: -1,
+  previews: {},      // נתיב תמונה -> data URI
+  positionIndex: -1, // השכבה שנמצאת כרגע במצב מיקום על המסך
+  allHidden: false,
+  dirty: false,
+};
+
+const $ = (id) => document.getElementById(id);
+
+// ---------------------------------------------------------------------------
+// עזרי תצוגה
+// ---------------------------------------------------------------------------
+const ANCHOR_H = ["שמאל", "מרכז", "ימין"];
+const ANCHOR_V = ["עליון", "אמצע", "תחתון"];
+
+function hex(l) {
+  const p = (n) => Math.max(0, Math.min(255, n | 0)).toString(16).padStart(2, "0");
+  return "#" + p(l.tintR) + p(l.tintG) + p(l.tintB);
+}
+
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, (c) =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+function baseName(path) {
+  if (!path) return "";
+  const i = Math.max(path.lastIndexOf("\\"), path.lastIndexOf("/"));
+  return i >= 0 ? path.slice(i + 1) : path;
+}
+
+function previewFor(layer) {
+  return layer && layer.image ? state.previews[layer.image] : null;
+}
+
+// מבקש תמונת תצוגה מקדימה מצד ה-C++ פעם אחת לכל נתיב.
+const requested = new Set();
+function ensurePreview(layer) {
+  if (!layer || !layer.image) return;
+  if (state.previews[layer.image] !== undefined || requested.has(layer.image)) return;
+  requested.add(layer.image);
+  send({ c: "needPreview", path: layer.image });
+}
+
+// ---------------------------------------------------------------------------
+// רשימת השכבות
+// ---------------------------------------------------------------------------
+function renderList() {
+  const list = $("layerList");
+  $("countPill").textContent = state.layers.length;
+  list.innerHTML = "";
+
+  state.layers.forEach((l, i) => {
+    const row = document.createElement("div");
+    row.className = "layer" + (i === state.selected ? " sel" : "") + (l.enabled ? "" : " off");
+    row.setAttribute("role", "option");
+    row.setAttribute("aria-selected", i === state.selected ? "true" : "false");
+    row.draggable = true;
+    row.dataset.i = i;
+
+    const uri = previewFor(l);
+    const mon = state.monitors[l.monitor];
+    const sub = `${l.width}×${l.height}  ·  ${mon ? "מסך " + (l.monitor + 1) : "מסך ?"}  ·  ${Math.round(l.opacity / 255 * 100)}%`;
+
+    row.innerHTML = `
+      <button class="switch" role="switch" aria-checked="${l.enabled}" aria-label="הפעל שכבה" data-act="toggle"></button>
+      ${uri ? `<img class="thumb" src="${uri}" alt="">`
+            : `<span class="thumb empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m3 16 5-5 4 4 3-3 6 6"/></svg></span>`}
+      <span class="meta">
+        <span class="name">${esc(l.name)}</span>
+        <span class="sub">${esc(sub)}</span>
+      </span>
+      <span class="grip"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg></span>`;
+
+    row.addEventListener("click", (e) => {
+      if (e.target.closest('[data-act="toggle"]')) {
+        patch(i, { enabled: !state.layers[i].enabled });
+        return;
+      }
+      select(i);
+    });
+
+    list.appendChild(row);
+    ensurePreview(l);
+  });
+
+  const has = state.selected >= 0;
+  $("btnDup").disabled = !has;
+  $("btnDel").disabled = !has;
+}
+
+// גרירה לשינוי סדר. הסדר הוא סדר הציור, ולכן הוא משנה מי מכסה את מי.
+let dragFrom = -1;
+$("layerList").addEventListener("dragstart", (e) => {
+  const row = e.target.closest(".layer");
+  if (!row) return;
+  dragFrom = +row.dataset.i;
+  row.classList.add("dragging");
+  e.dataTransfer.effectAllowed = "move";
+  e.dataTransfer.setData("text/plain", String(dragFrom));
+});
+$("layerList").addEventListener("dragend", () => {
+  dragFrom = -1;
+  document.querySelectorAll(".layer").forEach((r) =>
+    r.classList.remove("dragging", "drop-before", "drop-after"));
+});
+$("layerList").addEventListener("dragover", (e) => {
+  if (dragFrom < 0) return;
+  e.preventDefault();
+  const row = e.target.closest(".layer");
+  document.querySelectorAll(".layer").forEach((r) => r.classList.remove("drop-before", "drop-after"));
+  if (!row) return;
+  const box = row.getBoundingClientRect();
+  const after = e.clientY > box.top + box.height / 2;
+  row.classList.add(after ? "drop-after" : "drop-before");
+});
+$("layerList").addEventListener("drop", (e) => {
+  if (dragFrom < 0) return;
+  e.preventDefault();
+  const row = e.target.closest(".layer");
+  if (!row) return;
+  const box = row.getBoundingClientRect();
+  let to = +row.dataset.i + (e.clientY > box.top + box.height / 2 ? 1 : 0);
+  if (to > dragFrom) to--;
+  if (to !== dragFrom) send({ c: "move", from: dragFrom, to });
+});
+
+// ---------------------------------------------------------------------------
+// העורך
+// ---------------------------------------------------------------------------
+function renderEditor() {
+  const host = $("editor");
+  const l = state.layers[state.selected];
+
+  if (!l) {
+    host.innerHTML = `
+      <div class="empty">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round">
+          <path d="M12 3 3 7.5l9 4.5 9-4.5z"/><path d="M3 12l9 4.5 9-4.5"/><path d="M3 16.5 12 21l9-4.5"/>
+        </svg>
+        <h2>אין שכבה נבחרת</h2>
+        <p>שכבה היא תמונה שצפה מעל כל החלונות — לוגו, חותמת או סימן מים.
+           הוסיפו שכבה מהרשימה שמימין כדי להתחיל.</p>
+        <button class="btn primary" onclick="document.getElementById('btnAdd').click()">הוסף שכבה ראשונה</button>
+      </div>`;
+    return;
+  }
+
+  const uri = previewFor(l);
+  const mon = state.monitors[l.monitor] || { width: 1920, height: 1080 };
+  const inPos = state.positionIndex === state.selected;
+
+  host.innerHTML = `
+  <div class="editor-grid">
+    <div>
+      <fieldset>
+        <div class="group-title">תמונה ושם</div>
+        <div class="row">
+          <label for="fName">שם השכבה</label>
+          <input type="text" id="fName" value="${esc(l.name)}" maxlength="80">
+        </div>
+        <div class="row">
+          <label for="fImage">קובץ תמונה</label>
+          <div class="file-row">
+            <input type="text" id="fImage" value="${esc(l.image)}" placeholder="לא נבחרה תמונה" readonly title="${esc(l.image)}">
+            <button class="btn" id="btnBrowse">בחר…</button>
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <div class="group-title">גודל ומיקום</div>
+        <div class="row">
+          <label for="fWidth">גודל</label>
+          <div class="pair">
+            <span class="unit" data-unit="px"><input type="number" id="fWidth" value="${l.width}" min="16" max="20000" step="1" aria-label="רוחב"></span>
+            <span class="unit" data-unit="px"><input type="number" id="fHeight" value="${l.height}" min="16" max="20000" step="1" aria-label="גובה"></span>
+          </div>
+        </div>
+        <div class="row">
+          <span></span>
+          <label class="check">
+            <input type="checkbox" id="fLock" ${l.lockAspect ? "checked" : ""}>
+            <span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+            שמור פרופורציה של התמונה
+          </label>
+        </div>
+        <div class="row">
+          <label for="fMonitor">מסך יעד</label>
+          <select id="fMonitor">
+            ${state.monitors.map((m, i) =>
+              `<option value="${i}" ${i === l.monitor ? "selected" : ""}>${esc(m.label)}</option>`).join("")}
+          </select>
+        </div>
+
+        <div class="row">
+          <label>עיגון</label>
+          <div class="anchor-block">
+            <div class="anchor-pad" id="anchorPad" role="group" aria-label="פינת עיגון">
+              ${[0, 1, 2].map((v) => [0, 1, 2].map((h) =>
+                `<button type="button" data-h="${h}" data-v="${v}"
+                   aria-pressed="${l.anchorH === h && l.anchorV === v}"
+                   aria-label="${esc(ANCHOR_V[v] + " " + ANCHOR_H[h])}"><span class="dot"></span></button>`
+              ).join("")).join("")}
+            </div>
+            <div class="anchor-side">
+              <span class="anchor-name">מעוגן אל <b>${esc(ANCHOR_V[l.anchorV])} ${esc(ANCHOR_H[l.anchorH])}</b></span>
+              <div class="pair">
+                <span class="unit" data-unit="%"><input type="number" id="fOffX" value="${(+l.offsetX).toFixed(1)}" step="0.5" min="-100" max="100" aria-label="מרחק אופקי באחוזים"></span>
+                <span class="unit" data-unit="%"><input type="number" id="fOffY" value="${(+l.offsetY).toFixed(1)}" step="0.5" min="-100" max="100" aria-label="מרחק אנכי באחוזים"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="slider-row">
+          <label for="fRot">סיבוב</label>
+          <input type="range" id="fRot" min="-180" max="180" step="1" value="${l.rotation}">
+          <output id="outRot">${(+l.rotation).toFixed(0)}°</output>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <div class="group-title">מראה</div>
+        <div class="slider-row">
+          <label for="fOpacity">שקיפות</label>
+          <input type="range" id="fOpacity" min="0" max="255" step="1" value="${l.opacity}">
+          <output id="outOpacity">${Math.round(l.opacity / 255 * 100)}%</output>
+        </div>
+        <div class="row">
+          <label>צבע</label>
+          <div class="swatch-row">
+            <label class="check">
+              <input type="checkbox" id="fTint" ${l.useTint ? "checked" : ""}>
+              <span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+              צבע טינט
+            </label>
+            <button class="swatch" id="btnColor" style="background:${hex(l)}" title="בחר צבע" aria-label="בחר צבע טינט"></button>
+            <span class="swatch-hex">${hex(l).toUpperCase()}</span>
+          </div>
+        </div>
+        <div class="row">
+          <span></span>
+          <label class="check">
+            <input type="checkbox" id="fGray" ${l.grayscale ? "checked" : ""}>
+            <span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+            המר לגווני אפור
+          </label>
+        </div>
+        <div class="row">
+          <span></span>
+          <label class="check">
+            <input type="checkbox" id="fClick" ${l.clickThrough ? "checked" : ""}>
+            <span class="box"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+            לחיצות עוברות דרך השכבה
+          </label>
+        </div>
+      </fieldset>
+    </div>
+
+    <div class="preview-card">
+      <h3>תצוגה מקדימה</h3>
+      <div class="screen" id="screen" style="aspect-ratio:${mon.width}/${mon.height}">
+        <div class="taskbar"></div>
+        <div class="mini" id="mini"></div>
+      </div>
+      <dl class="preview-facts">
+        <dt>קובץ</dt><dd>${l.image ? esc(baseName(l.image)) : "—"}</dd>
+        <dt>מסך</dt><dd>${mon.width}×${mon.height}</dd>
+        <dt>גודל</dt><dd>${l.width}×${l.height} px</dd>
+      </dl>
+      <button class="btn ${inPos ? "on" : ""}" id="btnPosition">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 9V5h4M15 5h4v4M19 15v4h-4M9 19H5v-4"/></svg>
+        ${inPos ? "סיום מיקום (לחצו כשסיימתם)" : "מקם בגרירה על המסך"}
+      </button>
+    </div>
+  </div>`;
+
+  wireEditor(l);
+  renderMini();
+}
+
+// התצוגה המקדימה משקפת את אותם חישובי עיגון שצד ה-C++ מבצע.
+function renderMini() {
+  const l = state.layers[state.selected];
+  const mini = $("mini");
+  if (!l || !mini) return;
+
+  const mon = state.monitors[l.monitor] || { width: 1920, height: 1080 };
+  const uri = previewFor(l);
+
+  // הקופסה החוסמת אחרי סיבוב — בדיוק כמו RotatedExtent בצד הנייטיב.
+  const rad = (l.rotation || 0) * Math.PI / 180;
+  const bw = Math.abs(l.width * Math.cos(rad)) + Math.abs(l.height * Math.sin(rad));
+  const bh = Math.abs(l.width * Math.sin(rad)) + Math.abs(l.height * Math.cos(rad));
+
+  const wPct = bw / mon.width * 100;
+  const hPct = bh / mon.height * 100;
+
+  const style = { width: wPct + "%", height: hPct + "%" };
+  if (l.anchorH === 0)      { style.left = l.offsetX + "%"; }
+  else if (l.anchorH === 2) { style.right = l.offsetX + "%"; }
+  else                      { style.left = `calc(50% - ${wPct / 2}% + ${l.offsetX}%)`; }
+
+  if (l.anchorV === 0)      { style.top = l.offsetY + "%"; }
+  else if (l.anchorV === 2) { style.bottom = l.offsetY + "%"; }
+  else                      { style.top = `calc(50% - ${hPct / 2}% + ${l.offsetY}%)`; }
+
+  mini.removeAttribute("style");
+  Object.assign(mini.style, style);
+  mini.style.opacity = String(l.opacity / 255);
+
+  if (!uri) {
+    mini.className = "mini blank";
+    mini.innerHTML = "";
+    return;
+  }
+
+  mini.className = "mini";
+  mini.innerHTML =
+    `<img src="${uri}" alt="" style="transform:rotate(${l.rotation}deg);${l.grayscale ? "filter:grayscale(1);" : ""}">` +
+    // הטינט מוגבל למסכת התמונה, כך שהוא נוגע רק בפיקסלים הצבועים —
+    // אותה תוצאה שמטריצת הצבע נותנת בצד הנייטיב.
+    (l.useTint
+      ? `<span class="tintlayer" style="background:${hex(l)};transform:rotate(${l.rotation}deg);
+           -webkit-mask-image:url('${uri}');mask-image:url('${uri}')"></span>`
+      : "");
+}
+
+// ---------------------------------------------------------------------------
+// חיווט הפקדים
+// ---------------------------------------------------------------------------
+function wireEditor(l) {
+  const idx = state.selected;
+
+  // גודל התמונה המקורי, לשמירת הפרופורציה בזמן הקלדה.
+  const natural = l.imageW && l.imageH ? l.imageH / l.imageW : null;
+
+  $("fName").addEventListener("input", (e) => patch(idx, { name: e.target.value }, true));
+
+  $("fWidth").addEventListener("input", (e) => {
+    const w = Math.max(16, +e.target.value || 16);
+    const upd = { width: w };
+    if ($("fLock").checked) {
+      const ratio = natural || (l.height / l.width) || 1;
+      upd.height = Math.max(16, Math.round(w * ratio));
+      $("fHeight").value = upd.height;
+    }
+    patch(idx, upd, true);
+  });
+
+  $("fHeight").addEventListener("input", (e) => {
+    const h = Math.max(16, +e.target.value || 16);
+    const upd = { height: h };
+    if ($("fLock").checked) {
+      const ratio = natural || (l.width / l.height) || 1;
+      upd.width = Math.max(16, Math.round(h * ratio));
+      $("fWidth").value = upd.width;
+    }
+    patch(idx, upd, true);
+  });
+
+  $("fLock").addEventListener("change", (e) => patch(idx, { lockAspect: e.target.checked }, true));
+  $("fMonitor").addEventListener("change", (e) => patch(idx, { monitor: +e.target.value }));
+
+  $("anchorPad").addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-h]");
+    if (b) patch(idx, { anchorH: +b.dataset.h, anchorV: +b.dataset.v });
+  });
+
+  $("fOffX").addEventListener("input", (e) => patch(idx, { offsetX: +e.target.value || 0 }, true));
+  $("fOffY").addEventListener("input", (e) => patch(idx, { offsetY: +e.target.value || 0 }, true));
+
+  $("fRot").addEventListener("input", (e) => {
+    $("outRot").textContent = (+e.target.value).toFixed(0) + "°";
+    patch(idx, { rotation: +e.target.value }, true);
+  });
+
+  $("fOpacity").addEventListener("input", (e) => {
+    $("outOpacity").textContent = Math.round(+e.target.value / 255 * 100) + "%";
+    patch(idx, { opacity: +e.target.value }, true);
+  });
+
+  $("fTint").addEventListener("change", (e) => patch(idx, { useTint: e.target.checked }));
+  $("fGray").addEventListener("change", (e) => patch(idx, { grayscale: e.target.checked }));
+  $("fClick").addEventListener("change", (e) => patch(idx, { clickThrough: e.target.checked }));
+
+  $("btnBrowse").addEventListener("click", () => send({ c: "browse", i: idx }));
+  $("btnColor").addEventListener("click", () => send({ c: "color", i: idx }));
+  $("btnPosition").addEventListener("click", () => {
+    const on = state.positionIndex !== idx;
+    send({ c: "position", i: idx, on });
+  });
+}
+
+// ---------------------------------------------------------------------------
+// שינוי נתונים
+// ---------------------------------------------------------------------------
+// `light` מסמן עריכה תוך כדי הקלדה או גרירה: מרעננים רק את מה שזז,
+// כדי לא לבנות מחדש את כל העורך ולאבד את מיקוד ההקלדה.
+function patch(i, changes, light) {
+  const l = state.layers[i];
+  if (!l) return;
+  Object.assign(l, changes);
+  state.dirty = true;
+  updateStatus();
+  send({ c: "patch", i, layer: l });
+
+  if (light) {
+    renderMini();
+    refreshRow(i);
+  } else {
+    renderList();
+    renderEditor();
+  }
+}
+
+// מרענן שורה אחת ברשימה בלי לבנות מחדש את כולה.
+function refreshRow(i) {
+  const row = document.querySelector(`.layer[data-i="${i}"]`);
+  const l = state.layers[i];
+  if (!row || !l) return;
+  row.querySelector(".name").textContent = l.name;
+  const mon = state.monitors[l.monitor];
+  row.querySelector(".sub").textContent =
+    `${l.width}×${l.height}  ·  ${mon ? "מסך " + (l.monitor + 1) : "מסך ?"}  ·  ${Math.round(l.opacity / 255 * 100)}%`;
+  row.classList.toggle("off", !l.enabled);
+  row.querySelector(".switch").setAttribute("aria-checked", String(l.enabled));
+}
+
+function select(i) {
+  if (state.selected === i) return;
+  state.selected = i;
+  send({ c: "select", i });
+  renderList();
+  renderEditor();
+}
+
+function updateStatus() {
+  $("statusHint").textContent = state.dirty ? "יש שינויים שלא נשמרו" : "";
+}
+
+function toast(text, warn) {
+  const el = document.createElement("div");
+  el.className = "toast" + (warn ? " warn" : "");
+  el.textContent = text;
+  $("toasts").appendChild(el);
+  setTimeout(() => el.remove(), 2600);
+}
+
+function applyTheme() {
+  document.documentElement.setAttribute("data-theme", state.settings.lightTheme ? "light" : "dark");
+  // ירח במצב כהה, שמש במצב בהיר — הסמל מראה למה לוחצים.
+  $("themeIcon").innerHTML = state.settings.lightTheme
+    ? `<circle cx="12" cy="12" r="4.2"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M19.1 4.9l-1.4 1.4M6.3 17.7l-1.4 1.4"/>`
+    : `<path d="M21 12.8A8.5 8.5 0 1 1 11.2 3a6.6 6.6 0 0 0 9.8 9.8z"/>`;
+}
+
+function applySettings() {
+  $("setAutoStart").checked = state.settings.autoStart;
+  $("setTray").checked = state.settings.minimizeToTray;
+  $("setTrayIcon").checked = state.settings.showTrayIcon;
+  $("hotkeyHint").textContent = state.settings.hotkey;
+  $("hotkeyHint2").textContent = state.settings.hotkey;
+  applyTheme();
+}
+
+function pushSettings() {
+  state.settings.autoStart = $("setAutoStart").checked;
+  state.settings.minimizeToTray = $("setTray").checked;
+  state.settings.showTrayIcon = $("setTrayIcon").checked;
+  send({ c: "settings", settings: state.settings });
+}
+
+// ---------------------------------------------------------------------------
+// פקדים גלובליים
+// ---------------------------------------------------------------------------
+$("btnAdd").addEventListener("click", () => send({ c: "add" }));
+$("btnDup").addEventListener("click", () => send({ c: "duplicate", i: state.selected }));
+$("btnDel").addEventListener("click", () => {
+  const l = state.layers[state.selected];
+  if (l) send({ c: "delete", i: state.selected, name: l.name });
+});
+$("btnSave").addEventListener("click", () => send({ c: "save" }));
+$("btnToggleAll").addEventListener("click", () => send({ c: "toggleAll" }));
+$("btnTheme").addEventListener("click", () => {
+  state.settings.lightTheme = !state.settings.lightTheme;
+  applyTheme();
+  send({ c: "settings", settings: state.settings });
+});
+$("btnSettings").addEventListener("click", () => $("settingsDlg").showModal());
+$("btnExit").addEventListener("click", () => send({ c: "exit" }));
+["setAutoStart", "setTray", "setTrayIcon"].forEach((id) =>
+  $(id).addEventListener("change", pushSettings));
+
+document.addEventListener("keydown", (e) => {
+  if (e.ctrlKey && (e.key === "s" || e.key === "S")) { e.preventDefault(); send({ c: "save" }); return; }
+  if (e.target.matches("input, select, textarea")) return;
+  if (e.key === "Delete" && state.selected >= 0) { $("btnDel").click(); return; }
+  if (e.key === "ArrowDown" && state.selected < state.layers.length - 1) { e.preventDefault(); select(state.selected + 1); }
+  if (e.key === "ArrowUp" && state.selected > 0) { e.preventDefault(); select(state.selected - 1); }
+});
+
+// ---------------------------------------------------------------------------
+// הודעות נכנסות מצד ה-C++
+// ---------------------------------------------------------------------------
+if (HOST) {
+  HOST.addEventListener("message", (e) => {
+    const m = typeof e.data === "string" ? JSON.parse(e.data) : e.data;
+    switch (m.t) {
+      case "init":
+        state.monitors = m.monitors || [];
+        state.settings = Object.assign(state.settings, m.settings || {});
+        state.layers = m.layers || [];
+        state.selected = m.selected != null ? m.selected : (state.layers.length ? 0 : -1);
+        state.dirty = false;
+        applySettings();
+        updateStatus();
+        renderList();
+        renderEditor();
+        break;
+
+      case "layers":
+        state.layers = m.layers || [];
+        if (m.selected != null) state.selected = m.selected;
+        if (state.selected >= state.layers.length) state.selected = state.layers.length - 1;
+        renderList();
+        renderEditor();
+        break;
+
+      case "preview":
+        state.previews[m.path] = m.uri || null;
+        renderList();
+        renderMini();
+        break;
+
+      case "positionMode":
+        state.positionIndex = m.on ? m.i : -1;
+        renderEditor();
+        break;
+
+      case "hiddenAll":
+        state.allHidden = !!m.on;
+        $("toggleAllLabel").textContent = state.allHidden ? "הצג הכל" : "הסתר הכל";
+        $("btnToggleAll").classList.toggle("on", state.allHidden);
+        break;
+
+      case "saved":
+        state.dirty = false;
+        updateStatus();
+        toast("ההגדרות נשמרו");
+        break;
+
+      case "toast":
+        toast(m.text, m.warn);
+        break;
+    }
+  });
+  send({ c: "ready" });
+} else {
+  // נפתח בדפדפן רגיל בלי המארח — מציגים שכבת דוגמה כדי שהעיצוב ניתן לבדיקה.
+  state.monitors = [{ label: "מסך 1  (1920x1080)", width: 1920, height: 1080 }];
+  state.layers = [{
+    name: "לוגו", image: "", enabled: true, width: 240, height: 120, lockAspect: true,
+    monitor: 0, anchorH: 2, anchorV: 2, offsetX: 2, offsetY: 2, opacity: 200,
+    useTint: false, tintR: 255, tintG: 255, tintB: 255, rotation: 0,
+    clickThrough: true, grayscale: false,
+  }];
+  state.selected = 0;
+  applySettings();
+  renderList();
+  renderEditor();
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,41 @@
+#include <windows.h>
+#include "../src/resource.h"
+
+// ASCII only, so the .rc needs no code-page pragma to compile identically
+// under both the MSVC and the MinGW resource compilers.
+
+IDI_APP     ICON         "icon.ico"
+1           RT_MANIFEST  "app.manifest"
+
+// The manager UI is embedded, so the program stays a single self-contained
+// executable with nothing to copy alongside it.
+IDR_UI_HTML RCDATA       "../ui/index.html"
+
+VS_VERSION_INFO VERSIONINFO
+  FILEVERSION     3,1,0,0
+  PRODUCTVERSION  3,1,0,0
+  FILEFLAGSMASK   VS_FFI_FILEFLAGSMASK
+  FILEFLAGS       0
+  FILEOS          VOS_NT_WINDOWS32
+  FILETYPE        VFT_APP
+  FILESUBTYPE     VFT2_UNKNOWN
+BEGIN
+  BLOCK "StringFileInfo"
+  BEGIN
+    BLOCK "040904b0"
+    BEGIN
+      VALUE "CompanyName",      "tsoolgee"
+      VALUE "FileDescription",  "Overlay Manager - floating image overlays"
+      VALUE "FileVersion",      "3.1.0.0"
+      VALUE "InternalName",     "OverlayManager"
+      VALUE "OriginalFilename", "OverlayManager.exe"
+      VALUE "ProductName",      "Overlay Manager"
+      VALUE "ProductVersion",   "3.1.0.0"
+      VALUE "LegalCopyright",   "MIT License"
+    END
+  END
+  BLOCK "VarFileInfo"
+  BEGIN
+    VALUE "Translation", 0x409, 1200
+  END
+END

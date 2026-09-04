@@ -1,0 +1,62 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Restore the WebView2 SDK
+        shell: pwsh
+        run: |
+          nuget install Microsoft.Web.WebView2 -Version 1.0.2903.40 `
+            -OutputDirectory packages -ExcludeVersion
+          if (-not (Test-Path packages/Microsoft.Web.WebView2/build/native/include/WebView2.h)) {
+            throw "WebView2 SDK did not restore"
+          }
+
+      - name: Configure
+        run: >
+          cmake -S . -B build -A x64
+          -DWEBVIEW2_DIR="${{ github.workspace }}/packages/Microsoft.Web.WebView2"
+
+      - name: Build
+        run: cmake --build build --config Release --parallel
+
+      - name: Stage the artifact
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Copy-Item build/Release/OverlayManager.exe dist/
+          Copy-Item README.md, LICENSE dist/
+          # A single self-contained file: the static WebView2 loader and the
+          # static CRT mean there is nothing else to ship.
+          $exe = Get-Item dist/OverlayManager.exe
+          "OverlayManager.exe — {0:N0} bytes" -f $exe.Length
+          (Get-FileHash dist/OverlayManager.exe -Algorithm SHA256).Hash |
+            Out-File dist/OverlayManager.exe.sha256 -Encoding ascii
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: OverlayManager-win-x64
+          path: dist/
+
+      - name: Publish a release for a tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/OverlayManager.exe
+            dist/OverlayManager.exe.sha256
+          generate_release_notes: true

@@ -1,0 +1,7 @@
+build/
+dist/
+packages/
+out/
+.vs/
+*.user
+*.suo
