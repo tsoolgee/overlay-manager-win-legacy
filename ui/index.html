@@ -289,6 +289,18 @@ button {
 }
 .layer.off .name, .layer.off .thumb { opacity: .45; }
 
+/* קובץ שנמחק או הוזז — מסומן במפורש, במקום ריבוע ריק בלי הסבר */
+.layer .sub .warn, .file-warn { color: var(--danger); font-weight: 600; }
+.layer .thumb.gone { border-color: var(--danger); color: var(--danger); }
+.file-warn {
+  grid-column: 1 / -1;
+  font-size: 12.5px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.file-warn svg { width: 14px; height: 14px; flex: none; }
+
 .layer .grip { color: var(--muted); opacity: 0; }
 .layer:hover .grip, .layer.sel .grip { opacity: .7; }
 .layer .grip svg { width: 13px; height: 13px; display: block; }
@@ -777,8 +789,6 @@ dialog::backdrop { background: var(--scrim); }
   </header>
 
   <div class="body">
-    <main class="editor" id="editor"></main>
-
     <aside class="sidebar">
       <div class="sidebar-head">
         <h2>שכבות</h2>
@@ -800,6 +810,8 @@ dialog::backdrop { background: var(--scrim); }
         </button>
       </div>
     </aside>
+
+    <main class="editor" id="editor"></main>
   </div>
 
   <footer class="statusbar">
@@ -921,15 +933,19 @@ function renderList() {
 
     const uri = previewFor(l);
     const mon = state.monitors[l.monitor];
-    const sub = `${l.width}×${l.height}  ·  ${mon ? "מסך " + (l.monitor + 1) : "מסך ?"}  ·  ${Math.round(l.opacity / 255 * 100)}%`;
+    const sub = l.missing
+      ? `<span class="warn">הקובץ לא נמצא</span>`
+      : esc(`${l.width}×${l.height}  ·  ${mon ? "מסך " + (l.monitor + 1) : "מסך ?"}  ·  ${Math.round(l.opacity / 255 * 100)}%`);
 
     row.innerHTML = `
       <button class="switch" role="switch" aria-checked="${l.enabled}" aria-label="הפעל שכבה" data-act="toggle"></button>
       ${uri ? `<img class="thumb" src="${uri}" alt="">`
-            : `<span class="thumb empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m3 16 5-5 4 4 3-3 6 6"/></svg></span>`}
+            : `<span class="thumb empty${l.missing ? " gone" : ""}">${l.missing
+                ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 8v5M12 16.5v.01"/><path d="M10.3 3.9 2.4 17.5A1.8 1.8 0 0 0 4 20.2h16a1.8 1.8 0 0 0 1.6-2.7L13.7 3.9a1.8 1.8 0 0 0-3.1 0z"/></svg>`
+                : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m3 16 5-5 4 4 3-3 6 6"/></svg>`}</span>`}
       <span class="meta">
         <span class="name">${esc(l.name)}</span>
-        <span class="sub">${esc(sub)}</span>
+        <span class="sub">${sub}</span>
       </span>
       <span class="grip"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.6"/><circle cx="15" cy="6" r="1.6"/><circle cx="9" cy="12" r="1.6"/><circle cx="15" cy="12" r="1.6"/><circle cx="9" cy="18" r="1.6"/><circle cx="15" cy="18" r="1.6"/></svg></span>`;
 
@@ -1027,6 +1043,9 @@ function renderEditor() {
             <button class="btn" id="btnBrowse">בחר…</button>
           </div>
         </div>
+        ${l.missing ? `<div class="row"><span></span><span class="file-warn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 8v5M12 16.5v.01"/><path d="M10.3 3.9 2.4 17.5A1.8 1.8 0 0 0 4 20.2h16a1.8 1.8 0 0 0 1.6-2.7L13.7 3.9a1.8 1.8 0 0 0-3.1 0z"/></svg>
+          הקובץ לא נמצא בנתיב הזה — בחרו אותו מחדש</span></div>` : ""}
       </fieldset>
 
       <fieldset>
@@ -1283,8 +1302,10 @@ function refreshRow(i) {
   if (!row || !l) return;
   row.querySelector(".name").textContent = l.name;
   const mon = state.monitors[l.monitor];
-  row.querySelector(".sub").textContent =
-    `${l.width}×${l.height}  ·  ${mon ? "מסך " + (l.monitor + 1) : "מסך ?"}  ·  ${Math.round(l.opacity / 255 * 100)}%`;
+  // חייב להתאים ל-renderList, אחרת עריכה חיה הייתה מוחקת את אזהרת הקובץ החסר
+  row.querySelector(".sub").innerHTML = l.missing
+    ? `<span class="warn">הקובץ לא נמצא</span>`
+    : esc(`${l.width}×${l.height}  ·  ${mon ? "מסך " + (l.monitor + 1) : "מסך ?"}  ·  ${Math.round(l.opacity / 255 * 100)}%`);
   row.classList.toggle("off", !l.enabled);
   row.querySelector(".switch").setAttribute("aria-checked", String(l.enabled));
 }

@@ -55,10 +55,14 @@ js::Value LayerToJson(const Layer& l) {
     // Native pixel size, so the aspect lock in the UI uses the real ratio
     // rather than whatever the box happens to be set to right now.
     int iw = 0, ih = 0;
-    if (ImagePixelSize(l.image, iw, ih)) {
+    const bool readable = ImagePixelSize(l.image, iw, ih);
+    if (readable) {
         o["imageW"] = iw;
         o["imageH"] = ih;
     }
+    // A layer whose picture has been moved or deleted still has a path, and
+    // used to render as an unexplained blank. Say so instead.
+    o["missing"] = !l.image.empty() && !readable;
     return js::Value(std::move(o));
 }
 

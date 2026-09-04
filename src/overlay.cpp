@@ -444,7 +444,12 @@ void OverlayWindow::Render() {
 
 void OverlayWindow::ApplyVisibility() {
     if (!hwnd_) return;
-    const bool visible = layer_.enabled && !hiddenByHotkey_ && !layer_.image.empty();
+    // A layer whose file failed to load draws nothing, so keep its window out
+    // of the way entirely — unless it is being positioned, where the scrim is
+    // the only thing the user has to grab.
+    const bool hasContent = bitmap_ != nullptr;
+    const bool visible =
+        layer_.enabled && !hiddenByHotkey_ && (hasContent || positionMode_);
     // SWP_NOACTIVATE leaves focus with whatever the user is actually working in.
     SetWindowPos(hwnd_, HWND_TOPMOST, 0, 0, 0, 0,
                  SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE |

@@ -231,6 +231,15 @@ void ManagerWindow::FlushQueue() {
 void ManagerWindow::Show() {
     if (!hwnd_) return;
     ShowWindow(hwnd_, IsIconic(hwnd_) ? SW_RESTORE : SW_SHOW);
+
+    // The very first ShowWindow in a process ignores its argument and uses
+    // STARTUPINFO.wShowWindow instead, so a launcher that started us hidden
+    // would swallow the window on startup. SetWindowPos is not subject to that
+    // rule, so it is the reliable way to force the window out.
+    if (!IsWindowVisible(hwnd_))
+        SetWindowPos(hwnd_, nullptr, 0, 0, 0, 0,
+                     SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_SHOWWINDOW);
+
     SetForegroundWindow(hwnd_);
     if (impl_ && impl_->controller) impl_->controller->put_IsVisible(TRUE);
 }
