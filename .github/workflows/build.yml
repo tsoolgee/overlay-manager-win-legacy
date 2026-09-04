@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build:
@@ -52,11 +52,6 @@ jobs:
           name: OverlayManager-win-x64
           path: dist/
 
-      - name: Publish a release for a tag
-        if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            dist/OverlayManager.exe
-            dist/OverlayManager.exe.sha256
-          generate_release_notes: true
+      # Releases are published by hand with `gh release create`, not from here:
+      # a workflow can only authenticate as github-actions[bot], and that name
+      # would then be the one shown as the release author.
